@@ -1,97 +1,77 @@
 ﻿using CoffeeNChill.Functions.Interfaces;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
 using System.Net;
 
 namespace CoffeeNChill.Functions.Functions.StaffDocuments
 {
     public class DownloadStaffDocumentFunction
     {
-        private readonly IFileStorageService _fileStorageService;
-        private readonly ILogger<DownloadStaffDocumentFunction> _logger;
+        private readonly IFileStorageService _storage;
 
-        public DownloadStaffDocumentFunction(IFileStorageService fileStorageService, ILogger<DownloadStaffDocumentFunction> logger)
+        public DownloadStaffDocumentFunction(IFileStorageService storage)
         {
-            _fileStorageService = fileStorageService;
-            _logger = logger;
+            _storage = storage;
         }
 
         [Function("DownloadStaffDocument")]
         public async Task<HttpResponseData> Run(
-            [HttpTrigger(
-                AuthorizationLevel.Anonymous,
-                "get",
-                Route = "documents/download/{fileName}")]
-            HttpRequestData req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "documents/download/{fileName}")]
+            HttpRequestData request,
             string fileName)
         {
-            _logger.LogInformation("Retrieving staff document: {FileName}", fileName);
-
             try
             {
-                // 1. Validate file name
+                //Ensure a file name was supplied
                 if (string.IsNullOrWhiteSpace(fileName))
                 {
-                    var badRequest = req.CreateResponse(HttpStatusCode.BadRequest);
-
+                    var badRequest = request.CreateResponse(HttpStatusCode.BadRequest);
                     await badRequest.WriteAsJsonAsync(new
                     {
                         message = "A file name is required."
                     });
-
                     return badRequest;
                 }
 
-                // 2. Retrieve document from Blob Storage
-                Stream? fileStream = await _fileStorageService.DownloadDocumentAsync(fileName);
+                //Attempt to retrieve the document from storage
+                Stream? documentStream = await _storage.DownloadDocumentAsync(fileName);
 
-                // 3. Document not found
-                if (fileStream == null)
+                //Return message when the document does not exist
+                if (documentStream is null)
                 {
-                    _logger.LogWarning("Staff document not found: {FileName}", fileName);
-
-                    var notFound = req.CreateResponse(HttpStatusCode.NotFound);
-
+                    var notFound = request.CreateResponse(HttpStatusCode.NotFound);
                     await notFound.WriteAsJsonAsync(new
                     {
                         message = "The requested document was not found."
                     });
-
                     return notFound;
                 }
 
-                // 4. Create successful response
-                var response = req.CreateResponse(HttpStatusCode.OK);
+                //Build a successful download response
+                var successResponse = request.CreateResponse(HttpStatusCode.OK);
+                successResponse.Headers.Add("Content-Type", ResolveContentType(fileName));
+                successResponse.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
 
-                response.Headers.Add("Content-Type", GetContentType(fileName));
-                response.Headers.Add("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                //Stream the file content 
+                await documentStream.CopyToAsync(successResponse.Body);
+                await documentStream.DisposeAsync();
 
-                // 5. Send document to client
-                await fileStream.CopyToAsync(response.Body);
-
-                await fileStream.DisposeAsync();
-
-                _logger.LogInformation("Staff document retrieved successfully: {FileName}", fileName);
-
-                return response;
+                return successResponse;
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.LogError(ex, "Error retrieving staff document: {FileName}", fileName);
-
-                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-
+                //Failure response
+                var errorResponse = request.CreateResponse(HttpStatusCode.InternalServerError);
                 await errorResponse.WriteAsJsonAsync(new
                 {
                     message = "An unexpected error occurred while retrieving the document."
                 });
-
                 return errorResponse;
             }
         }
 
-        private static string GetContentType(string fileName)
+        //Maps a file extension
+        private static string ResolveContentType(string fileName)
         {
             string extension = Path.GetExtension(fileName).ToLowerInvariant();
 

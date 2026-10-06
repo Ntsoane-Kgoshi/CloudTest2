@@ -19,7 +19,7 @@ namespace CoffeeNChill.Functions.Services
         public TableStorageService(IConfiguration configuration)
         {
             string connectionString = configuration["AzureWebJobsStorage"] ??
-                throw new InvalidOperationException("AzureWebJobsStorage connection string is missing");
+                throw new InvalidOperationException("AzureWebJobsStrorage connection string is missing");
 
             _tableClient = new TableClient(connectionString, "MenuItems");
             _tableClient.CreateIfNotExists();
@@ -87,7 +87,7 @@ namespace CoffeeNChill.Functions.Services
         {
             List<MenuItem> menuItems = new List<MenuItem>();
 
-            string filter = $"PartitionKey eq '{category}'";
+            string filter = TableClient.CreateQueryFilter($"PartitionKey eq {category}");
 
             await foreach (MenuItem item in _tableClient.QueryAsync<MenuItem>(filter))
             {
@@ -105,10 +105,10 @@ namespace CoffeeNChill.Functions.Services
 
                 MenuItem menuItem = response.Value;
 
-                menuItem.Name = request.Name;
-                menuItem.Description = request.Description;
-                menuItem.Price = (float)request.Price;
-                menuItem.IsAvailable = request.IsAvailable;
+                menuItem.Name = request.Name ?? menuItem.Name;
+                menuItem.Description = request.Description ?? menuItem.Description;
+                menuItem.Price = request.Price ?? menuItem.Price;
+                menuItem.IsAvailable = request.IsAvailable ?? menuItem.IsAvailable;
 
                 await _tableClient.UpdateEntityAsync(menuItem, menuItem.ETag, TableUpdateMode.Replace);
 
