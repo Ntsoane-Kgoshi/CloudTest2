@@ -49,13 +49,15 @@ namespace CoffeeNChill.Functions.Services
                     HttpHeaders = headers
                 });
 
+            BlobProperties properties = await blobClient.GetPropertiesAsync();
+
             return new StaffDocument
             {
                 FileName = file.FileName,
                 Extension = Path.GetExtension(file.FileName),
                 Type = file.ContentType,
                 FileSize = file.Length,
-                UploadDate = DateTime.UtcNow,
+                UploadDate = properties.LastModified.UtcDateTime,
                 ContainerName = ContainerName
             };
         }
@@ -99,7 +101,7 @@ namespace CoffeeNChill.Functions.Services
                     Extension = Path.GetExtension(item.Name),
                     Type = properties.ContentType ?? string.Empty,
                     FileSize = properties.ContentLength,
-                    UploadDate = properties.LastModified.DateTime,
+                    UploadDate = properties.LastModified.UtcDateTime,
                     ContainerName = ContainerName
                 });
             }

@@ -6,15 +6,13 @@ using System.Threading.Tasks;
 
 namespace CoffeeNChill.Functions.DTOs
 {
-    public class UpdateMenuItemRequest
+    public class MenuItemResponse
     {
-        public string Name { get; set;  } = string.Empty;
-
+        public string Category { get; set; } = string.Empty;
+        public string SKU { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-
         public double Price { get; set; }
-
         public bool IsAvailable { get; set; }
-
     }
 }

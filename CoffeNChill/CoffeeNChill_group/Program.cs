@@ -14,6 +14,8 @@ builder.Services.AddApplicationInsightsTelemetryWorkerService().ConfigureFunctio
 builder.Services.AddSingleton<ITableStorageService, TableStorageService>();
 builder.Services.AddSingleton<IFileStorageService, FileStorageService>();
 
+builder.Services.AddSingleton<IOrderQueueService, OrderQueueService>();
+builder.Services.AddSingleton<IOrderTableService, OrderTableService>();
 
 
 builder.Build().Run();
